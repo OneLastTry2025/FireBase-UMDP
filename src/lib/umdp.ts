@@ -57,8 +57,8 @@ export class UMDProtocol {
     private encoder: SandboxEncoder;
     public lastSender: 'A' | 'B' | null = null;
 
-    constructor() {
-        this.sessionId = crypto.randomUUID();
+    constructor(sessionId?: string) {
+        this.sessionId = sessionId || crypto.randomUUID();
         this.encoder = new SandboxEncoder('devgpt-key', 'devgpt-salt');
     }
 

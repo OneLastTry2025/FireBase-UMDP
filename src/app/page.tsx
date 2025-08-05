@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Copy, SendHorizonal, Bot, User, RotateCw, Network, ShieldCheck, ShieldX, TriangleAlert } from "lucide-react";
+import { Copy, SendHorizonal, Bot, User, RotateCw, Network, ShieldCheck, ShieldX, TriangleAlert, LogIn, PlusCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -11,6 +11,9 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 type Message = {
   id: number;
@@ -31,20 +34,22 @@ export default function Home() {
   const [bobInput, setBobInput] = useState("");
   const [relayInput, setRelayInput] = useState("");
   const [relayStatus, setRelayStatus] = useState<RelayStatus>({ text: "Awaiting datagram...", type: "info" });
+  const [joinSessionId, setJoinSessionId] = useState("");
+  const [isJoinDialogOpen, setIsJoinDialogOpen] = useState(false);
 
   const aliceMessagesEndRef = useRef<HTMLDivElement>(null);
   const bobMessagesEndRef = useRef<HTMLDivElement>(null);
 
-  const initializeSession = () => {
-    const newProtocol = new UMDProtocol();
+  const initializeSession = (sessionId?: string) => {
+    const newProtocol = new UMDProtocol(sessionId);
     setProtocol(newProtocol);
     setMessages([]);
     setAliceInput("");
     setBobInput("");
     setRelayInput("");
-    setRelayStatus({ text: `New session started: ${newProtocol.sessionId}. Alice to start.`, type: "info" });
+    setRelayStatus({ text: `Session ${sessionId ? 'joined' : 'started'}: ${newProtocol.sessionId}. Alice to start.`, type: "info" });
     toast({
-      title: "New Session Initialized",
+      title: `Session ${sessionId ? 'Joined' : 'Initialized'}`,
       description: `Session ID: ${newProtocol.sessionId}`,
     });
   };
@@ -92,7 +97,6 @@ export default function Home() {
     try {
       const { message, sender } = protocol.unpack(relayInput);
       
-      // We need to create a new instance to reflect state changes within the object
       const newProtocol = Object.assign(Object.create(Object.getPrototypeOf(protocol)), protocol);
       setProtocol(newProtocol);
       
@@ -123,16 +127,60 @@ export default function Home() {
     }
   }
 
+  const handleJoinSession = () => {
+    if (joinSessionId.trim()) {
+      initializeSession(joinSessionId.trim());
+      setIsJoinDialogOpen(false);
+      setJoinSessionId("");
+    } else {
+      toast({ variant: "destructive", title: "Error", description: "Session ID cannot be empty." });
+    }
+  };
+
+
   return (
     <div className="min-h-screen bg-background text-foreground p-4 sm:p-6 lg:p-8">
       <header className="text-center mb-8">
         <h1 className="font-headline text-4xl font-bold tracking-tight text-primary">UMDP Relay</h1>
         <p className="text-muted-foreground mt-2 max-w-2xl mx-auto">A simulation of a User-Mediated Datagram Protocol. Two AIs, Alice and Bob, communicate through you. Create a message, copy the generated datagram, and relay it to the other party.</p>
-        <div className="mt-4">
-          <Button onClick={initializeSession} variant="outline">
-            <RotateCw className="mr-2 h-4 w-4" />
-            Reset Session
+        <div className="mt-4 flex justify-center gap-2">
+          <Button onClick={() => initializeSession()} variant="outline">
+            <PlusCircle className="mr-2 h-4 w-4" />
+            New Session
           </Button>
+           <Dialog open={isJoinDialogOpen} onOpenChange={setIsJoinDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline">
+                <LogIn className="mr-2 h-4 w-4" />
+                Join Session
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Join an Existing Session</DialogTitle>
+                <DialogDescription>
+                  Enter the Session ID from another agent to start communicating with them.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="session-id" className="text-right">
+                    Session ID
+                  </Label>
+                  <Input
+                    id="session-id"
+                    value={joinSessionId}
+                    onChange={(e) => setJoinSessionId(e.target.value)}
+                    className="col-span-3"
+                    placeholder="Paste session ID here"
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button onClick={handleJoinSession}>Join Session</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </header>
 
@@ -200,7 +248,14 @@ export default function Home() {
                 <Copy className="h-4 w-4" />
               </Button>
             </div>
-             {protocol && <Badge variant="secondary" className="w-full justify-center p-2">Session: {protocol.sessionId}</Badge>}
+             {protocol && (
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary" className="w-full justify-center p-2">Session: {protocol.sessionId}</Badge>
+                <Button variant="outline" size="icon" onClick={() => handleCopyToClipboard(protocol.sessionId)}>
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
           </CardContent>
           <CardFooter>
             <Button onClick={handleRelay} className="w-full bg-accent hover:bg-accent/90">
